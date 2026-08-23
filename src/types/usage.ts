@@ -185,9 +185,9 @@ export interface UsageRangeSelection {
  * only ever show a partial number and mislead users into reading it as the
  * Desktop's full usage. The backend collapses `claude-desktop → claude` in
  * every dashboard query (see `folded_app_type_sql`).
- * `opencode` and `pi` have no proxy handler; their usage reaches this
- * dashboard through session importers. `openclaw` / `hermes` appear only as
- * managed apps elsewhere.
+ * `opencode`, `pi`, and `hermes` have no proxy handler; their usage reaches
+ * this dashboard through session importers. `openclaw` appears only as a
+ * managed app elsewhere.
  */
 export type AppType =
   | "claude"
@@ -195,6 +195,7 @@ export type AppType =
   | "gemini"
   | "grokbuild"
   | "opencode"
+  | "hermes"
   | "pi";
 
 export type AppTypeFilter = "all" | AppType;
@@ -205,6 +206,7 @@ export const KNOWN_APP_TYPES: ReadonlyArray<AppType> = [
   "gemini",
   "grokbuild",
   "opencode",
+  "hermes",
   "pi",
 ];
 

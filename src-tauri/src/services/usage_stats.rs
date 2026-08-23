@@ -217,6 +217,7 @@ fn provider_name_coalesce(log_alias: &str, provider_alias: &str) -> String {
          WHEN '_opencode_session' THEN 'OpenCode (Session)' \
          WHEN '_grok_session' THEN 'Grok Build (Session)' \
          WHEN '_pi_session' THEN 'Pi (Session)' \
+         WHEN '_hermes_session' THEN 'Hermes (Session)' \
          ELSE {log_alias}.provider_id END)"
     )
 }
@@ -3874,6 +3875,37 @@ mod tests {
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].provider_id, "_opencode_session");
         assert_eq!(stats[0].provider_name, "OpenCode (Session)");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_provider_stats_labels_hermes_session_provider() -> Result<(), AppError> {
+        let db = Database::memory()?;
+
+        {
+            let conn = lock_conn!(db.conn);
+            insert_usage_log(
+                &conn,
+                "hermes-session",
+                "hermes",
+                "_hermes_session",
+                "hermes-model",
+                "hermes_session",
+                1000,
+                100,
+                50,
+                0,
+                0,
+                200,
+                "0.01",
+            )?;
+        }
+
+        let stats = db.get_provider_stats(None, None, Some("hermes"), None, None)?;
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].provider_id, "_hermes_session");
+        assert_eq!(stats[0].provider_name, "Hermes (Session)");
 
         Ok(())
     }

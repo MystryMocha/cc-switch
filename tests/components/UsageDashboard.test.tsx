@@ -124,6 +124,30 @@ describe("UsageDashboard", () => {
     expect(screen.getByTestId("select-5000")).toBeInTheDocument();
   });
 
+  it("filters usage queries to Hermes", async () => {
+    renderDashboard();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "usage.appFilter.hermes" }),
+    );
+
+    await waitFor(() =>
+      expect(useProviderStatsMock).toHaveBeenLastCalledWith(
+        expect.anything(),
+        { appType: "hermes" },
+        expect.anything(),
+      ),
+    );
+    expect(useModelStatsMock).toHaveBeenLastCalledWith(
+      expect.anything(),
+      { appType: "hermes", providerName: undefined },
+      expect.anything(),
+    );
+    expect(usageHeroMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ appType: "hermes" }),
+    );
+  });
+
   it("filters usage queries to Pi", async () => {
     renderDashboard();
 

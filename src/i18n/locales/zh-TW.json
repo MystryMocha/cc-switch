@@ -1717,6 +1717,7 @@
       "gemini": "Gemini",
       "opencode": "OpenCode",
       "grokbuild": "Grok Build",
+      "hermes": "Hermes",
       "pi": "Pi"
     },
     "rawInputLabel": "原始",

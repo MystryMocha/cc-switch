@@ -96,6 +96,11 @@ pub fn sync_all_unlocked(db: &Database) -> SessionSyncResult {
         "Pi",
         crate::services::session_usage_pi::sync_pi_usage(db),
     );
+    merge_sync_step(
+        &mut result,
+        "Hermes",
+        crate::services::session_usage_hermes::sync_hermes_usage(db),
+    );
     notify_sync_result(&result);
     result
 }
