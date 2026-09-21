@@ -534,6 +534,8 @@ function App() {
     // settingsData 未加载时跳过，避免用 fallback false 覆盖 Rust 侧已设好的装饰状态
     if (!settingsData) return;
 
+    if (!isLinux()) return;
+
     const syncWindowDecorations = async () => {
       try {
         await getCurrentWindow().setDecorations(!useAppWindowControls);

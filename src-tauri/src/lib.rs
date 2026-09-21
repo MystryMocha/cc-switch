@@ -76,7 +76,23 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    sync::{Arc, OnceLock},
+    time::Instant,
+};
+
+static APP_STARTED_AT: OnceLock<Instant> = OnceLock::new();
+
+fn mark_app_started() {
+    let _ = APP_STARTED_AT.set(Instant::now());
+}
+
+fn app_started_recently() -> bool {
+    APP_STARTED_AT
+        .get()
+        .is_some_and(|started| started.elapsed() < std::time::Duration::from_secs(4))
+}
 #[cfg(target_os = "macos")]
 use tauri::image::Image;
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
@@ -399,8 +415,21 @@ pub fn run() {
                 && !startup_page_handled.swap(true, Ordering::Relaxed)
                 && !crate::settings::get_settings().silent_startup
             {
-                let _ = webview.window().show();
+                let window = webview.window();
+                let _ = window.set_skip_taskbar(false);
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
                 log::info!("主页面加载完成，主窗口已显示");
+                let window_again = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                    let _ = window_again.set_skip_taskbar(false);
+                    let _ = window_again.unminimize();
+                    let _ = window_again.show();
+                    let _ = window_again.set_focus();
+                    log::info!("主窗口二次显示（防止启动时被立刻隐藏）");
+                });
             }
         });
     }
@@ -422,6 +451,19 @@ pub fn run() {
                 }
 
                 let settings = crate::settings::get_settings();
+
+                if crate::app_started_recently() {
+                    api.prevent_close();
+                    #[cfg(target_os = "windows")]
+                    {
+                        let _ = window.set_skip_taskbar(false);
+                    }
+                    let _ = window.unminimize();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                    log::info!("忽略启动阶段的关闭请求，保持主窗口可见");
+                    return;
+                }
 
                 if settings.minimize_to_tray_on_close {
                     api.prevent_close();
@@ -450,6 +492,7 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
+            mark_app_started();
             let _ = rustls::crypto::ring::default_provider().install_default();
 
             // 预先刷新 Store 覆盖配置，确保后续路径读取正确（日志/数据库等）
