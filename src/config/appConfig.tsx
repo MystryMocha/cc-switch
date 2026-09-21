@@ -19,6 +19,7 @@ export interface AppConfig {
 export const APP_IDS: AppId[] = [
   "claude",
   "claude-desktop",
+  "cursor",
   "codex",
   "gemini",
   "grokbuild",
@@ -40,6 +41,7 @@ export const DEFAULT_VISIBLE_APPS: VisibleApps = {
   hermes: true,
   pi: true,
   mcode: true,
+  cursor: true,
 };
 
 /** App IDs shown in Skills panels. */
@@ -52,6 +54,7 @@ export const SKILLS_APP_IDS: AppId[] = [
   "hermes",
   "pi",
   "mcode",
+  "cursor",
 ];
 
 export type ProxyAppId = Extract<
@@ -98,6 +101,7 @@ export const MCP_APP_IDS: McpAppId[] = [
   "opencode",
   "hermes",
   "mcode",
+  "cursor",
 ];
 
 export function isMcpAppId(appId: string): appId is McpAppId {
@@ -204,6 +208,21 @@ export const APP_ICON_MAP: Record<AppId, AppConfig> = {
       "bg-fuchsia-500/10 ring-1 ring-fuchsia-500/20 hover:bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400",
     badgeClass:
       "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 border-0 gap-1.5",
+  },
+  cursor: {
+    label: "Cursor",
+    icon: (
+      <ProviderIcon
+        icon="cursor"
+        name="Cursor"
+        size={14}
+        showFallback={false}
+      />
+    ),
+    activeClass:
+      "bg-zinc-500/10 ring-1 ring-zinc-500/20 hover:bg-zinc-500/20 text-zinc-700 dark:text-zinc-300",
+    badgeClass:
+      "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-500/20 border-0 gap-1.5",
   },
 };
 

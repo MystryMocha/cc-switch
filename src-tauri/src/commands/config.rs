@@ -153,6 +153,15 @@ pub async fn get_config_status(
                 path,
             })
         }
+        AppType::Cursor => {
+            let path = crate::cursor_config::get_cursor_dir()
+                .to_string_lossy()
+                .to_string();
+            let exists = crate::cursor_config::get_cursor_live_provider_path().exists()
+                || crate::cursor_config::get_cursor_mcp_path().exists()
+                || crate::cursor_config::get_cursor_dir().exists();
+            Ok(ConfigStatus { exists, path })
+        }
     }
 }
 
@@ -179,6 +188,7 @@ pub async fn get_config_dir(app: String) -> Result<String, String> {
             .parent()
             .unwrap()
             .to_path_buf(),
+        AppType::Cursor => crate::cursor_config::get_cursor_dir(),
     };
 
     Ok(dir.to_string_lossy().to_string())
@@ -202,6 +212,7 @@ pub async fn open_config_folder(handle: AppHandle, app: String) -> Result<bool, 
             .parent()
             .unwrap()
             .to_path_buf(),
+        AppType::Cursor => crate::cursor_config::get_cursor_dir(),
     };
 
     if !config_dir.exists() {

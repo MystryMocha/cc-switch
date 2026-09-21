@@ -247,6 +247,13 @@ impl Provider {
                 );
                 (base_url, api_key)
             }
+            AppType::Cursor => {
+                let env = settings.get("env");
+                (
+                    str_at(env.and_then(|e| e.get("OPENAI_BASE_URL"))),
+                    first_non_empty(env, &["OPENAI_API_KEY"]),
+                )
+            }
         };
 
         // Normalize like the JS-script path (extract_base_url_from_provider) so a

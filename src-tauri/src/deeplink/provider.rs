@@ -162,6 +162,13 @@ pub(crate) fn build_provider_from_request(
                 "Pi providers must be added from the Pi provider page".to_string(),
             ));
         }
+        AppType::Cursor => json!({
+            "env": {
+                "OPENAI_API_KEY": request.api_key.clone().unwrap_or_default(),
+                "OPENAI_BASE_URL": request.endpoint.clone().unwrap_or_default(),
+                "OPENAI_MODEL": request.model.clone().unwrap_or_default(),
+            }
+        }),
     };
 
     // Build usage script configuration if provided

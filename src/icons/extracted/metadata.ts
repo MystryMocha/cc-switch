@@ -287,6 +287,13 @@ export const iconMetadata: Record<string, IconMetadata> = {
     keywords: [],
     defaultColor: "currentColor",
   },
+  cursor: {
+    name: "cursor",
+    displayName: "Cursor",
+    category: "ai-provider",
+    keywords: ["cursor", "anysphere"],
+    defaultColor: "currentColor",
+  },
   etok: {
     name: "etok",
     displayName: "ETok",

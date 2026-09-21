@@ -9,6 +9,7 @@ mod codex_history_migration;
 mod codex_state_db;
 mod commands;
 mod config;
+mod cursor_config;
 mod database;
 mod deeplink;
 mod error;
@@ -974,6 +975,14 @@ pub fn run() {
                     }
                     Ok(_) => log::debug!("○ No Hermes MCP servers found to import"),
                     Err(e) => log::warn!("✗ Failed to import Hermes MCP: {e}"),
+                }
+
+                match crate::services::mcp::McpService::import_from_cursor(&app_state) {
+                    Ok(count) if count > 0 => {
+                        log::info!("✓ Imported {count} MCP server(s) from Cursor");
+                    }
+                    Ok(_) => log::debug!("○ No Cursor MCP servers found to import"),
+                    Err(e) => log::warn!("✗ Failed to import Cursor MCP: {e}"),
                 }
             }
 

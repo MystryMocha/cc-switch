@@ -127,6 +127,7 @@ impl ConfigService {
             }
             AppType::Gemini => Self::sync_gemini_live(config, &current_id, &provider)?,
             AppType::GrokBuild => crate::grok_config::write_grok_provider_live(&provider)?,
+            AppType::Cursor => crate::cursor_config::write_cursor_provider_live(&provider)?,
             AppType::OpenCode => {
                 // OpenCode uses additive mode, no live sync needed
                 // OpenCode providers are managed directly in the config file

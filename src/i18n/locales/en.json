@@ -915,7 +915,16 @@
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
     "pi": "Pi",
-    "mcode": "MiniMax Code"
+    "mcode": "MiniMax Code",
+    "cursor": "Cursor"
+  },
+  "cursor": {
+    "form": {
+      "required": "Enter an API key and Override OpenAI Base URL",
+      "hint": "Switching writes ~/.cursor/cc-switch-provider.json and tries to update Cursor IDE BYOK. Restart Cursor; if it does not take effect, paste the OpenAI API Key and Override Base URL in Settings → Models.",
+      "baseUrl": "Override OpenAI Base URL",
+      "model": "Model ID"
+    }
   },
   "pi": {
     "empty": {
@@ -1681,6 +1690,7 @@
     "preset30d": "30d",
     "totalRequests": "Total Requests",
     "totalCost": "Total Cost",
+    "cursorPoolCostHint": "Cursor cost is list-price draw on the first-party / third-party pools, not out-of-pocket spend",
     "cost": "Cost",
     "unpriced": "Unpriced",
     "perMillion": "(per million)",
@@ -1724,7 +1734,8 @@
       "opencode": "OpenCode",
       "grokbuild": "Grok Build",
       "pi": "Pi",
-      "mcode": "MiniMax Code"
+      "mcode": "MiniMax Code",
+      "cursor": "Cursor"
     },
     "rawInputLabel": "Raw",
     "sessionSync": {
@@ -2029,7 +2040,8 @@
         "opencode": "OpenCode",
         "openclaw": "OpenClaw",
         "hermes": "Hermes",
-        "mcode": "MiniMax Code"
+        "mcode": "MiniMax Code",
+        "cursor": "Cursor"
       }
     },
     "userLevelPath": "User-level MCP path",
@@ -3256,6 +3268,8 @@
     "weeklyLimit": "Weekly",
     "monthly": "Monthly",
     "credits": "Credits",
+    "cursorFirstParty": "First-party",
+    "cursorThirdParty": "Third-party",
     "copilotPremium": "Premium",
     "utilization": "{{value}}%",
     "resetsIn": "Resets in {{time}}",

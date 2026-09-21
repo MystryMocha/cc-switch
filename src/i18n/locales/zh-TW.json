@@ -916,7 +916,16 @@
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
     "pi": "Pi",
-    "mcode": "MiniMax Code"
+    "mcode": "MiniMax Code",
+    "cursor": "Cursor"
+  },
+  "cursor": {
+    "form": {
+      "required": "請填寫 API Key 和 Override OpenAI Base URL",
+      "hint": "切換後會寫入 ~/.cursor/cc-switch-provider.json，並嘗試更新 Cursor IDE 的 BYOK。請重啟 Cursor；若未生效，到 Settings → Models 貼上 OpenAI API Key 和 Override Base URL。",
+      "baseUrl": "Override OpenAI Base URL",
+      "model": "模型 ID"
+    }
   },
   "pi": {
     "empty": {
@@ -1682,6 +1691,7 @@
     "preset30d": "30d",
     "totalRequests": "總請求數",
     "totalCost": "總成本",
+    "cursorPoolCostHint": "Cursor 成本依第一方/第三方池的模型標價累計，不是實付金額",
     "cost": "成本",
     "unpriced": "未定價",
     "perMillion": "(每百萬)",
@@ -1725,7 +1735,8 @@
       "opencode": "OpenCode",
       "grokbuild": "Grok Build",
       "pi": "Pi",
-      "mcode": "MiniMax Code"
+      "mcode": "MiniMax Code",
+      "cursor": "Cursor"
     },
     "rawInputLabel": "原始",
     "sessionSync": {
@@ -2030,7 +2041,8 @@
         "opencode": "OpenCode",
         "openclaw": "OpenClaw",
         "hermes": "Hermes",
-        "mcode": "MiniMax Code"
+        "mcode": "MiniMax Code",
+        "cursor": "Cursor"
       }
     },
     "userLevelPath": "使用者級 MCP 設定路徑",
@@ -3257,6 +3269,8 @@
     "weeklyLimit": "每週",
     "monthly": "每月",
     "credits": "額度",
+    "cursorFirstParty": "第一方池",
+    "cursorThirdParty": "第三方池",
     "copilotPremium": "進階請求",
     "utilization": "{{value}}%",
     "resetsIn": "{{time}} 後重設",

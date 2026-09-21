@@ -22,6 +22,7 @@ interface DirectorySettingsProps {
   openclawDir?: string;
   hermesDir?: string;
   piDir?: string;
+  cursorDir?: string;
   onDirectoryChange: (app: DirectoryAppId, value?: string) => void;
   onBrowseDirectory: (app: DirectoryAppId) => Promise<void>;
   onResetDirectory: (app: DirectoryAppId) => Promise<void>;
@@ -41,6 +42,7 @@ export function DirectorySettings({
   openclawDir,
   hermesDir,
   piDir,
+  cursorDir,
   onDirectoryChange,
   onBrowseDirectory,
   onResetDirectory,
@@ -183,6 +185,21 @@ export function DirectorySettings({
           onChange={(val) => onDirectoryChange("pi", val)}
           onBrowse={() => onBrowseDirectory("pi")}
           onReset={() => onResetDirectory("pi")}
+        />
+
+        <DirectoryInput
+          label={t("settings.cursorConfigDir", {
+            defaultValue: "Cursor 配置目录",
+          })}
+          description={undefined}
+          value={cursorDir}
+          resolvedValue={resolvedDirs.cursor}
+          placeholder={t("settings.browsePlaceholderCursor", {
+            defaultValue: "默认 ~/.cursor",
+          })}
+          onChange={(val) => onDirectoryChange("cursor", val)}
+          onBrowse={() => onBrowseDirectory("cursor")}
+          onReset={() => onResetDirectory("cursor")}
         />
       </section>
     </div>
