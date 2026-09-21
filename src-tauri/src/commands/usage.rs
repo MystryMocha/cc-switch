@@ -255,11 +255,7 @@ pub async fn sync_session_usage(
     let _guard = crate::services::session_usage::session_sync_mutex()
         .lock()
         .await;
-    tauri::async_runtime::spawn_blocking(move || {
-        crate::services::session_usage::sync_all_unlocked(&db)
-    })
-    .await
-    .map_err(|error| AppError::Message(format!("会话用量同步任务失败: {error}")))
+    Ok(crate::services::session_usage::sync_all(db).await)
 }
 
 /// Codex reset 成功后，无论重导是否导入新行或返回错误，都必须通知前端刷新。

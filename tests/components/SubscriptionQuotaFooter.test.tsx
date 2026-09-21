@@ -118,3 +118,48 @@ describe("Claude Fable subscription quota", () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 });
+
+describe("Cursor first-party and third-party pools", () => {
+  it("shows both Cursor usage pools", () => {
+    renderQuota(
+      [
+        {
+          name: "cursor_first_party",
+          utilization: 0.32,
+          resetsAt: "2026-10-16T00:00:00Z",
+          usedValueUsd: 9.7,
+          maxValueUsd: 3000,
+        },
+        {
+          name: "cursor_third_party",
+          utilization: 36.17,
+          resetsAt: "2026-10-16T00:00:00Z",
+          usedValueUsd: 36.17,
+          maxValueUsd: 100,
+        },
+      ],
+      true,
+    );
+    const first = screen.getByText("第一方池:").parentElement!;
+    expect(within(first).getByText("0%")).toBeInTheDocument();
+    expect(within(first).getByText("($9.70/$3000.00)")).toBeInTheDocument();
+    const third = screen.getByText("第三方池:").parentElement!;
+    expect(within(third).getByText("36%")).toBeInTheDocument();
+    expect(within(third).getByText("($36.17/$100.00)")).toBeInTheDocument();
+    expect(screen.queryByText("每月:")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["zh-TW", "第一方池:", "第三方池:"],
+    ["en", "First-party:", "Third-party:"],
+    ["ja", "ファーストパーティ:", "サードパーティ:"],
+  ])("localizes Cursor pool labels in %s", async (language, first, third) => {
+    await i18n.changeLanguage(language);
+    renderQuota([
+      { name: "cursor_first_party", utilization: 1, resetsAt: null },
+      { name: "cursor_third_party", utilization: 2, resetsAt: null },
+    ]);
+    expect(screen.getByText(first)).toBeInTheDocument();
+    expect(screen.getByText(third)).toBeInTheDocument();
+  });
+});

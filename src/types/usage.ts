@@ -186,8 +186,9 @@ export interface UsageRangeSelection {
  * Desktop's full usage. The backend collapses `claude-desktop → claude` in
  * every dashboard query (see `folded_app_type_sql`).
  * `opencode` and `pi` have no proxy handler; their usage reaches this
- * dashboard through session importers. `openclaw` / `hermes` appear only as
- * managed apps elsewhere.
+ * dashboard through session importers. Cursor has no local billed logs —
+ * its rows come from Cursor's dashboard API. `openclaw` / `hermes` appear
+ * only as managed apps elsewhere.
  */
 export type AppType =
   | "claude"
@@ -196,7 +197,8 @@ export type AppType =
   | "grokbuild"
   | "opencode"
   | "pi"
-  | "mcode";
+  | "mcode"
+  | "cursor";
 
 export type AppTypeFilter = "all" | AppType;
 
@@ -208,6 +210,7 @@ export const KNOWN_APP_TYPES: ReadonlyArray<AppType> = [
   "opencode",
   "pi",
   "mcode",
+  "cursor",
 ];
 
 /**

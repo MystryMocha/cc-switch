@@ -1288,31 +1288,53 @@ pub fn run() {
                         let _guard = crate::services::session_usage::session_sync_mutex()
                             .lock()
                             .await;
-                        let task = tauri::async_runtime::spawn_blocking(move || {
-                            if backfill {
-                                if let Err(error) = db.backfill_missing_usage_costs() {
+                        if backfill {
+                            let db_for_backfill = db.clone();
+                            match tauri::async_runtime::spawn_blocking(move || {
+                                db_for_backfill.backfill_missing_usage_costs()
+                            })
+                            .await
+                            {
+                                Ok(Err(error)) => {
                                     log::warn!("Usage cost startup backfill failed: {error}");
                                 }
+                                Err(error) => {
+                                    log::warn!("Usage cost startup backfill task failed: {error}");
+                                }
+                                Ok(Ok(_)) => {}
                             }
-                            if !crate::settings::get_settings().session_auto_sync_enabled {
-                                return crate::services::session_usage::SessionSyncResult::default();
-                            }
-                            crate::services::session_usage::sync_all_unlocked(&db)
-                        });
-                        match task.await {
-                            Ok(result) if !result.errors.is_empty() => {
-                                log::warn!(
-                                    "Session usage sync completed with {} error(s)",
-                                    result.errors.len()
-                                );
-                            }
-                            Ok(_) => {}
-                            Err(error) => log::warn!("Session usage blocking task failed: {error}"),
+                        }
+                        if !crate::settings::get_settings().session_auto_sync_enabled {
+                            return;
+                        }
+                        let result =
+                            crate::services::session_usage::sync_all_with_cursor(db, false).await;
+                        if !result.errors.is_empty() {
+                            log::warn!(
+                                "Session usage sync completed with {} error(s)",
+                                result.errors.len()
+                            );
                         }
                     }
 
-                    // 首次同步（含费用回填）
+                    // 首次同步（含费用回填）；Cursor 云端用量推迟，避免拖垮启动窗口
                     run_session_sync(db_for_session_sync.clone(), true).await;
+                    let db_for_cursor = db_for_session_sync.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+                        if !crate::settings::get_settings().session_auto_sync_enabled {
+                            return;
+                        }
+                        match crate::services::session_usage_cursor::sync_cursor_usage(&db_for_cursor)
+                            .await
+                        {
+                            Ok(result) if result.imported > 0 => {
+                                crate::usage_events::notify_log_recorded();
+                            }
+                            Ok(_) => {}
+                            Err(error) => log::warn!("Cursor 用量同步失败: {error}"),
+                        }
+                    });
 
                     // 定期同步
                     let mut interval = tokio::time::interval(std::time::Duration::from_secs(

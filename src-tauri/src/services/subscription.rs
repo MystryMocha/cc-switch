@@ -333,6 +333,19 @@ pub const TIER_THIRTY_DAY: &str = "30_day";
 /// 映射到 `subscription.credits`，tray 归入 "c" 分组。
 pub const TIER_CREDITS: &str = "credits";
 
+/// Cursor 个人套餐的第一方模型池（Auto / Composer / Cursor Grok）。
+/// 对应 Dashboard `planUsage.autoPercentUsed`，与 `totalSpend/limit` 不是同一本账。
+pub const TIER_CURSOR_FIRST_PARTY: &str = "cursor_first_party";
+
+/// Cursor 第三方 API 模型池（Claude / GPT / Gemini 等）。
+/// 对应 Dashboard `planUsage.apiPercentUsed`。
+pub const TIER_CURSOR_THIRD_PARTY: &str = "cursor_third_party";
+
+/// `GetAggregatedUsageEvents.aggregations[].tier`：第三方池。
+const CURSOR_AGG_TIER_THIRD_PARTY: i64 = 1;
+/// `GetAggregatedUsageEvents.aggregations[].tier`：第一方池。
+const CURSOR_AGG_TIER_FIRST_PARTY: i64 = 2;
+
 /// Gemini 用量分组名称（按模型而非时间窗口）。`classify_gemini_model` 输出。
 pub const TIER_GEMINI_PRO: &str = "gemini_pro";
 pub const TIER_GEMINI_FLASH: &str = "gemini_flash";
@@ -1417,11 +1430,176 @@ pub async fn get_subscription_quota(tool: &str) -> Result<SubscriptionQuota, Str
             }
         }
         "grokbuild" => crate::services::subscription_grok::get_grok_subscription_quota().await,
+        "cursor" => query_cursor_quota().await,
         _ => Ok(SubscriptionQuota::not_found(tool)),
     }
 }
 
 // ── 辅助函数 ──────────────────────────────────────────────
+
+async fn query_cursor_quota() -> Result<SubscriptionQuota, String> {
+    match crate::services::session_usage_cursor::fetch_current_period_usage().await {
+        Err(error) => {
+            let message = error.to_string();
+            if message.contains("cursor_auth_missing") {
+                return Ok(SubscriptionQuota::not_found("cursor"));
+            }
+            if message.contains("HTTP 401") {
+                return Ok(SubscriptionQuota::error(
+                    "cursor",
+                    CredentialStatus::Expired,
+                    "Cursor 登录已过期，请在 Cursor 里重新登录".to_string(),
+                ));
+            }
+            Err(message)
+        }
+        Ok(period) => {
+            let aggregations =
+                crate::services::session_usage_cursor::fetch_aggregated_usage_events()
+                    .await
+                    .ok();
+            Ok(parse_cursor_quota(&period, aggregations.as_ref()))
+        }
+    }
+}
+
+fn cursor_json_f64(value: Option<&serde_json::Value>) -> Option<f64> {
+    crate::services::session_usage_cursor::json_number_f64(value)
+}
+
+fn cursor_json_i64(value: Option<&serde_json::Value>) -> Option<i64> {
+    crate::services::session_usage_cursor::json_number_i64(value)
+}
+
+fn cursor_pool_spend_usd(aggregations: Option<&serde_json::Value>, tier: i64) -> Option<f64> {
+    let rows = aggregations
+        .and_then(|value| value.get("aggregations"))
+        .and_then(serde_json::Value::as_array)?;
+    let mut cents = 0.0;
+    let mut found = false;
+    for row in rows {
+        if cursor_json_i64(row.get("tier")) == Some(tier) {
+            cents += cursor_json_f64(row.get("totalCents")).unwrap_or(0.0);
+            found = true;
+        }
+    }
+    found.then_some(cents / 100.0)
+}
+
+/// 用「已用金额 ÷ 占用百分比」反推该池额度。百分比过小/过大时不推断，避免炸出天文数字。
+fn inferred_cursor_pool_limit_usd(used_usd: f64, percent: f64) -> Option<f64> {
+    if used_usd <= 0.0 || !(0.05..=99.5).contains(&percent) {
+        return None;
+    }
+    Some(used_usd / (percent / 100.0))
+}
+
+fn cursor_pool_tier(
+    name: &str,
+    percent: f64,
+    resets_at: Option<String>,
+    used_usd: Option<f64>,
+) -> QuotaTier {
+    let max_value_usd = used_usd.and_then(|used| inferred_cursor_pool_limit_usd(used, percent));
+    QuotaTier {
+        name: name.to_string(),
+        utilization: percent,
+        resets_at,
+        used_value_usd: used_usd,
+        max_value_usd,
+    }
+}
+
+fn cursor_on_demand_usage(spend_limit: Option<&serde_json::Value>) -> Option<ExtraUsage> {
+    let spend = spend_limit?;
+    if spend.is_null() {
+        return None;
+    }
+    let used_cents = cursor_json_f64(spend.get("individualUsed"))
+        .or_else(|| cursor_json_f64(spend.get("pooledUsed")))
+        .or_else(|| cursor_json_f64(spend.get("totalSpend")));
+    let limit_cents = cursor_json_f64(spend.get("individualLimit"))
+        .or_else(|| cursor_json_f64(spend.get("pooledLimit")));
+    if used_cents.is_none() && limit_cents.is_none() {
+        return None;
+    }
+    let used_usd = used_cents.map(|cents| cents / 100.0);
+    let limit_usd = limit_cents.map(|cents| cents / 100.0);
+    let utilization = match (used_usd, limit_usd) {
+        (Some(used), Some(limit)) if limit > 0.0 => Some(used / limit * 100.0),
+        _ => None,
+    };
+    Some(ExtraUsage {
+        is_enabled: true,
+        monthly_limit: limit_usd,
+        used_credits: used_usd,
+        utilization,
+        currency: Some("USD".to_string()),
+    })
+}
+
+fn parse_cursor_quota(
+    period: &serde_json::Value,
+    aggregations: Option<&serde_json::Value>,
+) -> SubscriptionQuota {
+    let plan = period
+        .get("planUsage")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let auto_percent = cursor_json_f64(plan.get("autoPercentUsed"));
+    let api_percent = cursor_json_f64(plan.get("apiPercentUsed"));
+    let resets_at = cursor_json_i64(period.get("billingCycleEnd"))
+        .and_then(|ms| chrono::DateTime::from_timestamp_millis(ms).map(|dt| dt.to_rfc3339()));
+    let first_party_used = cursor_pool_spend_usd(aggregations, CURSOR_AGG_TIER_FIRST_PARTY);
+    let third_party_used = cursor_pool_spend_usd(aggregations, CURSOR_AGG_TIER_THIRD_PARTY);
+
+    let tiers = if auto_percent.is_some() || api_percent.is_some() {
+        vec![
+            cursor_pool_tier(
+                TIER_CURSOR_FIRST_PARTY,
+                auto_percent.unwrap_or(0.0),
+                resets_at.clone(),
+                first_party_used,
+            ),
+            cursor_pool_tier(
+                TIER_CURSOR_THIRD_PARTY,
+                api_percent.unwrap_or(0.0),
+                resets_at,
+                third_party_used,
+            ),
+        ]
+    } else {
+        // 旧 Team 套餐没有分池字段，回退到 included spend / limit 这一本账。
+        let total_spend = cursor_json_f64(plan.get("totalSpend")).unwrap_or(0.0);
+        let limit = cursor_json_f64(plan.get("limit")).unwrap_or(0.0);
+        let utilization = if limit > 0.0 {
+            (total_spend / limit) * 100.0
+        } else {
+            cursor_json_f64(plan.get("totalPercentUsed")).unwrap_or(0.0)
+        };
+        vec![QuotaTier {
+            name: TIER_MONTHLY.to_string(),
+            utilization,
+            resets_at,
+            used_value_usd: Some(total_spend / 100.0),
+            max_value_usd: Some(limit / 100.0),
+        }]
+    };
+
+    SubscriptionQuota {
+        tool: "cursor".to_string(),
+        credential_status: CredentialStatus::Valid,
+        credential_message: period
+            .get("displayMessage")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        success: true,
+        tiers,
+        extra_usage: cursor_on_demand_usage(period.get("spendLimitUsage")),
+        error: None,
+        queried_at: Some(now_millis()),
+    }
+}
 
 fn now_millis() -> i64 {
     SystemTime::now()
@@ -1593,5 +1771,118 @@ mod tests {
         // 其他窗口按小时/天回退命名
         assert_eq!(window_seconds_to_tier_name(3600), "1_hour");
         assert_eq!(window_seconds_to_tier_name(86400), "1_day");
+    }
+
+    #[test]
+    fn cursor_quota_splits_first_party_and_third_party_pools() {
+        let period = serde_json::json!({
+            "billingCycleEnd": "1792177929000",
+            "planUsage": {
+                "totalSpend": 4587,
+                "includedSpend": 4587,
+                "remaining": 35413,
+                "limit": 40000,
+                "autoPercentUsed": 0.3233333333333333,
+                "apiPercentUsed": 36.17,
+                "totalPercentUsed": 1.4796774193548388
+            },
+            "spendLimitUsage": { "limitType": "user" },
+            "displayMessage": "You've used 11% of your included usage"
+        });
+        let aggregations = serde_json::json!({
+            "aggregations": [
+                { "modelIntent": "claude-fable-5-1-thinking-high", "totalCents": 3617.44, "tier": 1 },
+                { "modelIntent": "cursor-grok-4.6-xhigh-fast", "totalCents": 970.28, "tier": 2 }
+            ]
+        });
+        let quota = parse_cursor_quota(&period, Some(&aggregations));
+        assert!(quota.success);
+        assert_eq!(quota.tool, "cursor");
+        assert_eq!(
+            quota
+                .tiers
+                .iter()
+                .map(|tier| tier.name.as_str())
+                .collect::<Vec<_>>(),
+            [TIER_CURSOR_FIRST_PARTY, TIER_CURSOR_THIRD_PARTY]
+        );
+        assert!((quota.tiers[0].utilization - 0.3233333333333333).abs() < 1e-9);
+        assert!((quota.tiers[1].utilization - 36.17).abs() < 1e-9);
+        // 不得把 includedSpend/limit（约 11%）当成唯一池。
+        assert!(quota
+            .tiers
+            .iter()
+            .all(|tier| (tier.utilization - 11.4675).abs() > 1.0));
+        assert!((quota.tiers[0].used_value_usd.unwrap() - 9.7028).abs() < 0.001);
+        assert!((quota.tiers[1].used_value_usd.unwrap() - 36.1744).abs() < 0.001);
+        let first_max = quota.tiers[0].max_value_usd.unwrap();
+        let third_max = quota.tiers[1].max_value_usd.unwrap();
+        assert!(
+            (first_max - 3000.0).abs() < 20.0,
+            "first-party cap ≈ $3000, got {first_max}"
+        );
+        assert!(
+            (third_max - 100.0).abs() < 1.0,
+            "third-party cap ≈ $100, got {third_max}"
+        );
+        assert!(quota.extra_usage.is_none());
+        assert_eq!(
+            quota.credential_message.as_deref(),
+            Some("You've used 11% of your included usage")
+        );
+    }
+
+    #[test]
+    fn cursor_quota_falls_back_to_monthly_when_pools_are_absent() {
+        let quota = parse_cursor_quota(
+            &serde_json::json!({
+                "billingCycleEnd": "1792177929000",
+                "planUsage": { "totalSpend": 1288, "limit": 2000 }
+            }),
+            None,
+        );
+        assert_eq!(quota.tiers.len(), 1);
+        assert_eq!(quota.tiers[0].name, TIER_MONTHLY);
+        assert!((quota.tiers[0].utilization - 64.4).abs() < 0.01);
+        assert_eq!(quota.tiers[0].used_value_usd, Some(12.88));
+        assert_eq!(quota.tiers[0].max_value_usd, Some(20.0));
+    }
+
+    #[test]
+    fn cursor_quota_zero_pool_percent_is_still_two_tiers() {
+        let quota = parse_cursor_quota(
+            &serde_json::json!({
+                "planUsage": { "autoPercentUsed": 0.0, "apiPercentUsed": 0.0, "limit": 40000 }
+            }),
+            None,
+        );
+        assert_eq!(quota.tiers.len(), 2);
+        assert_eq!(quota.tiers[0].name, TIER_CURSOR_FIRST_PARTY);
+        assert_eq!(quota.tiers[1].name, TIER_CURSOR_THIRD_PARTY);
+        assert_eq!(quota.tiers[0].utilization, 0.0);
+        assert_eq!(quota.tiers[1].utilization, 0.0);
+        assert!(quota.tiers[0].used_value_usd.is_none());
+        assert!(quota.tiers[0].max_value_usd.is_none());
+    }
+
+    #[test]
+    fn cursor_quota_reads_on_demand_spend_limit() {
+        let quota = parse_cursor_quota(
+            &serde_json::json!({
+                "planUsage": { "autoPercentUsed": 1.0, "apiPercentUsed": 2.0 },
+                "spendLimitUsage": {
+                    "individualUsed": 250,
+                    "individualLimit": 10000,
+                    "limitType": "user"
+                }
+            }),
+            None,
+        );
+        let extra = quota.extra_usage.expect("on-demand");
+        assert!(extra.is_enabled);
+        assert_eq!(extra.used_credits, Some(2.5));
+        assert_eq!(extra.monthly_limit, Some(100.0));
+        assert!((extra.utilization.unwrap() - 2.5).abs() < 1e-9);
+        assert_eq!(extra.currency.as_deref(), Some("USD"));
     }
 }

@@ -42,6 +42,9 @@ export const TIER_I18N_KEYS: Record<string, string> = {
   credits: "subscription.credits",
   // GitHub Copilot
   premium: "subscription.copilotPremium",
+  // Cursor 个人套餐的两个用量池
+  cursor_first_party: "subscription.cursorFirstParty",
+  cursor_third_party: "subscription.cursorThirdParty",
 };
 
 /** 根据使用百分比返回颜色 class */

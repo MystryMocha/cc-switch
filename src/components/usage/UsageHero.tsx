@@ -77,6 +77,10 @@ const TITLE_THEMES: Record<AppType | "all", TitleTheme> = {
     accent: "text-fuchsia-600 dark:text-fuchsia-400",
     iconBg: "bg-fuchsia-500/10",
   },
+  cursor: {
+    accent: "text-neutral-800 dark:text-neutral-200",
+    iconBg: "bg-neutral-500/10",
+  },
 };
 
 /**
@@ -290,7 +294,14 @@ export function UsageHero({
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
                     {t("usage.totalCost")}
                   </span>
-                  <span className="font-semibold text-green-500 text-sm tabular-nums">
+                  <span
+                    className="font-semibold text-green-500 text-sm tabular-nums"
+                    title={
+                      appType === "cursor"
+                        ? t("usage.cursorPoolCostHint")
+                        : undefined
+                    }
+                  >
                     {totalCost == null ? "--" : fmtUsd(totalCost, 4)}
                   </span>
                 </div>

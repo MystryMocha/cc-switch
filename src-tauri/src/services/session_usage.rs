@@ -154,6 +154,49 @@ pub fn sync_all_unlocked(db: &Database) -> SessionSyncResult {
     result
 }
 
+/// Local session importers plus Cursor's dashboard API. Caller must hold
+/// [`session_sync_mutex`].
+pub async fn sync_all(db: std::sync::Arc<Database>) -> SessionSyncResult {
+    sync_all_with_cursor(db, true).await
+}
+
+pub async fn sync_all_with_cursor(
+    db: std::sync::Arc<Database>,
+    include_cursor: bool,
+) -> SessionSyncResult {
+    let db_local = db.clone();
+    let mut result = tauri::async_runtime::spawn_blocking(move || sync_all_unlocked(&db_local))
+        .await
+        .unwrap_or_else(|error| {
+            let mut failed = SessionSyncResult::default();
+            failed.errors.push(format!("会话用量同步任务失败: {error}"));
+            failed
+        });
+    log::info!(
+        "本地会话用量同步完成: imported={} skipped={} errors={}",
+        result.imported,
+        result.skipped,
+        result.errors.len()
+    );
+    if include_cursor {
+        let local_imported = result.imported;
+        merge_sync_step(
+            &mut result,
+            "Cursor",
+            crate::services::session_usage_cursor::sync_cursor_usage(&db).await,
+        );
+        if result.imported > local_imported {
+            crate::usage_events::notify_log_recorded();
+        }
+    }
+    if !result.errors.is_empty() {
+        for error in &result.errors {
+            log::warn!("会话用量同步: {error}");
+        }
+    }
+    result
+}
+
 pub(crate) fn notify_sync_result(result: &SessionSyncResult) {
     if result.imported > 0 {
         crate::usage_events::notify_log_recorded();

@@ -35,6 +35,10 @@ const GEMINI_PRO_TIER_NAMES: &[&str] = &[crate::services::subscription::TIER_GEM
 const GEMINI_FLASH_TIER_NAMES: &[&str] = &[crate::services::subscription::TIER_GEMINI_FLASH];
 const GEMINI_FLASH_LITE_TIER_NAMES: &[&str] =
     &[crate::services::subscription::TIER_GEMINI_FLASH_LITE];
+const CURSOR_FIRST_PARTY_TIER_NAMES: &[&str] =
+    &[crate::services::subscription::TIER_CURSOR_FIRST_PARTY];
+const CURSOR_THIRD_PARTY_TIER_NAMES: &[&str] =
+    &[crate::services::subscription::TIER_CURSOR_THIRD_PARTY];
 const TIER_LABEL_GROUPS: &[(&str, &[&str])] = &[
     ("h", H_TIER_NAMES),
     ("w", W_TIER_NAMES),
@@ -44,6 +48,8 @@ const TIER_LABEL_GROUPS: &[(&str, &[&str])] = &[
     ("p", GEMINI_PRO_TIER_NAMES),
     ("f", GEMINI_FLASH_TIER_NAMES),
     ("l", GEMINI_FLASH_LITE_TIER_NAMES),
+    ("1P", CURSOR_FIRST_PARTY_TIER_NAMES),
+    ("3P", CURSOR_THIRD_PARTY_TIER_NAMES),
 ];
 
 /// 每个 app 分区的子菜单句柄，用于 usage 更新时就地改 label 而非整菜单重建。
@@ -1243,10 +1249,10 @@ mod tests {
     use crate::app_config::AppType;
     use crate::provider::{Provider, UsageData, UsageResult};
     use crate::services::subscription::{
-        CredentialStatus, QuotaTier, SubscriptionQuota, TIER_FIVE_HOUR, TIER_GEMINI_FLASH,
-        TIER_GEMINI_FLASH_LITE, TIER_GEMINI_PRO, TIER_MONTHLY, TIER_SEVEN_DAY,
-        TIER_SEVEN_DAY_FABLE, TIER_SEVEN_DAY_OPUS, TIER_SEVEN_DAY_SONNET, TIER_THIRTY_DAY,
-        TIER_WEEKLY_LIMIT,
+        CredentialStatus, QuotaTier, SubscriptionQuota, TIER_CURSOR_FIRST_PARTY,
+        TIER_CURSOR_THIRD_PARTY, TIER_FIVE_HOUR, TIER_GEMINI_FLASH, TIER_GEMINI_FLASH_LITE,
+        TIER_GEMINI_PRO, TIER_MONTHLY, TIER_SEVEN_DAY, TIER_SEVEN_DAY_FABLE, TIER_SEVEN_DAY_OPUS,
+        TIER_SEVEN_DAY_SONNET, TIER_THIRTY_DAY, TIER_WEEKLY_LIMIT,
     };
     use crate::services::usage_cache::UsageCache;
 
@@ -1638,6 +1644,22 @@ mod tests {
     fn unknown_tiers_return_none() {
         let quota = make_quota("claude", true, vec![tier("one_hour", 80.0)]);
         assert!(format_subscription_summary(&quota).is_none());
+    }
+
+    #[test]
+    fn cursor_summary_shows_first_and_third_party_pools() {
+        let quota = make_quota(
+            "cursor",
+            true,
+            vec![
+                tier(TIER_CURSOR_FIRST_PARTY, 0.32),
+                tier(TIER_CURSOR_THIRD_PARTY, 36.17),
+            ],
+        );
+        assert_eq!(
+            format_subscription_summary(&quota).as_deref(),
+            Some("🟢 1P0% 3P36%")
+        );
     }
 
     #[test]
